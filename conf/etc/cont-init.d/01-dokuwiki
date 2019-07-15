@@ -1,0 +1,182 @@
+#!/usr/bin/with-contenv sh
+
+run(){
+  eval "su - nginx -s /bin/ash -c 'cd /var/www/dokuwiki/ && "$@"'" 
+  return $? 
+}
+
+enable_plugin() {
+    sed -i "/$1/d" /var/www/dokuwiki/conf/plugins.local.php
+}
+
+disable_plugin() {
+    ! grep "$1" /var/www/dokuwiki/conf/plugins.local.php && \
+    echo "\$plugins['$1'] = 0;" >>plugins.local.php
+}
+
+check_bool() {
+    bool=$(eval echo $"$1" | tr A-Z a-z)
+    case "$bool" in
+        true|yes)
+            eval "$1"=1 ;;
+        *)
+            eval "$1"=0 ;;
+    esac
+}
+
+check_language() {
+    for lang in $(ls /var/www/dokuwiki/inc/lang)
+    do
+        [ "$lang" = "$1" ] && return 0
+    done
+
+    return 1
+}
+
+install(){
+    echo "> Install"
+    if [ ! -d /var/www/dokuwiki ] 
+    then
+        echo ">>> No volume mounted"
+        echo ">>>>> Creating working dir"
+        mkdir -p /var/www/dokuwiki
+    fi
+
+    if [ ! -d /var/www/error ]
+    then
+        echo ">>> Creating static web error pages"
+        mkdir -p /var/www/error
+        mv /opt/ressources/www/error/*.html /var/www/error/ 2>/dev/null
+
+        chown nginx:nginx /var/www/error -R
+    fi
+
+    ls /var/www/dokuwiki/index.php >/dev/null 2>&1
+    INSTALLED=$?
+
+    echo "INSTALLED = $INSTALLED"
+
+    if [ ! $INSTALLED -eq 0 ]
+    then
+        echo ">>> Downloading dokuwiki"
+        wget https://download.dokuwiki.org/src/dokuwiki/dokuwiki-stable.tgz \
+        -O /tmp/dokuwiki.tgz ||  return 1 
+
+        echo ">>> Extracting "
+        tar -xzf /tmp/dokuwiki.tgz -C /var/www/dokuwiki --strip-components=1 || return 1
+        rm /tmp/dokuwiki.tgz
+
+        echo ">>> Fixing permissions"
+        chown nginx:nginx /var/www/dokuwiki -R
+
+        config
+    fi
+
+    return 0
+}
+
+config(){
+    echo "> Config"
+
+    cd /var/www/dokuwiki
+
+    if check_language "${APP_LANGUAGE}"
+    then
+        echo ">>>>> Changing application language to ${APP_LANGUAGE}"
+    else
+        echo ">>>>> Application language ${APP_LANGUAGE} not found, leaving default language"
+        echo "List of languages available = $(ls /var/www/dokuwiki/inc/lang)"
+        APP_LANGUAGE=en
+    fi
+
+    echo ">>> Patching install.php script"
+    cp install.php install.php.old
+    sed -i "s/isset(\$_REQUEST\['submit'\])/true/" install.php
+    sed -i "s/\$_REQUEST/\$FAKE_REQUEST/g" install.php
+
+    case "${ACL_POLICY}" in
+        open)
+            ACL_POLICY=0 ;;
+        public)
+            ACL_POLICY=1 ;;
+        closed)
+            ACL_POLICY=2 ;;
+        *)
+            ACL_POLICY=2 ;;
+    esac
+
+    check_bool USE_LDAP
+    check_bool ALLOW_REG
+    check_bool SEND_USAGE_DATA
+
+    FAKE="<?php
+
+\$FAKE_REQUEST['l'] = '${APP_LANGUAGE}';
+\$FAKE_REQUEST['d'] = array(
+'title'     => '${TITLE}',
+'acl'       => '1',
+'superuser' => '${ADMIN_USERNAME}',
+'fullname'  => '${ADMIN_FULLNAME}',
+'email'     => '${ADMIN_EMAIL}',
+'password'  => '${ADMIN_PASSWORD}',
+'confirm'   => '${ADMIN_PASSWORD}',
+'policy'    => '${ACL_POLICY}',
+'allowreg'  => '${ALLOW_REG}',
+'license'   => '${LICENSE}',
+'pop'       => '${SEND_USAGE_DATA}'
+);
+"
+
+    echo "$FAKE" >install.php.tmp
+    tail -n +2 install.php >>install.php.tmp
+    mv install.php.tmp install.php
+
+    chown nginx:nginx install.php install.php.old
+
+    echo ">>> Running install.php script"
+    run php install.php >/dev/null
+
+    echo ">>> Setting up plugins"
+    disable_plugin authpdo
+
+    if [ "$USE_LDAP" -eq 1 ]
+    then
+        echo ">>> Configuring LDAP authentication"
+        enable_plugin authldap
+
+        LDAP_CONF="
+    /**
+    * LDAP configuration
+    */
+    \$conf['authtype']       = 'authldap';
+
+    \$conf['plugin']['authldap']['server']        = '${LDAP_HOST}';
+    \$conf['plugin']['authldap']['port']          = '389';
+    \$conf['plugin']['authldap']['version']       = 3;
+    \$conf['plugin']['authldap']['binddn']        = 'cn=admin,${LDAP_BASE_DN}';
+    \$conf['plugin']['authldap']['bindpw']        = '<b>$(echo -n ${LDAP_ADMIN_PASS} | base64)';
+    \$conf['plugin']['authldap']['usertree']      = 'ou=people,${LDAP_BASE_DN}';
+    \$conf['plugin']['authldap']['grouptree']     = 'ou=groups,${LDAP_BASE_DN}';
+    \$conf['plugin']['authldap']['userfilter']    = 'uid=%{user}';
+    \$conf['plugin']['authldap']['groupfilter']   = '(|(gidNumber=%{gid})(memberUID=%{user}))';
+    "
+
+        echo "$LDAP_CONF" >>conf/local.php
+    fi
+
+    return 0
+}
+
+fail(){
+    echo "[ Failed ]"
+    echo "1" > /tmp/dokuwiki
+    exit 1
+}
+
+success(){
+    echo "[ Success ]"
+    echo "0" > /tmp/dokuwiki
+    exit 0
+}
+
+install && success || fail
