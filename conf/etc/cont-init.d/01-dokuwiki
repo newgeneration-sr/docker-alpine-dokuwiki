@@ -143,23 +143,23 @@ config(){
     then
         echo ">>> Configuring LDAP authentication"
         enable_plugin authldap
-
+        sed -i "/\$conf\['superuser'\].*/c\\\$conf\['superuser'\] = '@$LDAP_ADMIN_GROUP';" conf/local.php
         LDAP_CONF="
-    /**
-    * LDAP configuration
-    */
-    \$conf['authtype']       = 'authldap';
+/**
+* LDAP configuration
+*/
+\$conf['authtype']       = 'authldap';
 
-    \$conf['plugin']['authldap']['server']        = '${LDAP_HOST}';
-    \$conf['plugin']['authldap']['port']          = '389';
-    \$conf['plugin']['authldap']['version']       = 3;
-    \$conf['plugin']['authldap']['binddn']        = 'cn=admin,${LDAP_BASE_DN}';
-    \$conf['plugin']['authldap']['bindpw']        = '<b>$(echo -n ${LDAP_ADMIN_PASS} | base64)';
-    \$conf['plugin']['authldap']['usertree']      = 'ou=people,${LDAP_BASE_DN}';
-    \$conf['plugin']['authldap']['grouptree']     = 'ou=groups,${LDAP_BASE_DN}';
-    \$conf['plugin']['authldap']['userfilter']    = 'uid=%{user}';
-    \$conf['plugin']['authldap']['groupfilter']   = '(|(gidNumber=%{gid})(memberUID=%{user}))';
-    "
+\$conf['plugin']['authldap']['server']        = '${LDAP_HOST}';
+\$conf['plugin']['authldap']['port']          = '389';
+\$conf['plugin']['authldap']['version']       = 3;
+\$conf['plugin']['authldap']['binddn']        = 'cn=admin,${LDAP_BASE_DN}';
+\$conf['plugin']['authldap']['bindpw']        = '<b>$(echo -n ${LDAP_ADMIN_PASS} | base64)';
+\$conf['plugin']['authldap']['usertree']      = 'ou=people,${LDAP_BASE_DN}';
+\$conf['plugin']['authldap']['grouptree']     = 'ou=groups,${LDAP_BASE_DN}';
+\$conf['plugin']['authldap']['userfilter']    = 'uid=%{user}';
+\$conf['plugin']['authldap']['groupfilter']   = '(|(gidNumber=%{gid})(member=uid=%{user},ou=people,${LDAP_BASE_DN}))';
+"
 
         echo "$LDAP_CONF" >>conf/local.php
     fi
