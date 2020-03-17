@@ -3,7 +3,7 @@ version: '3.1'
 services:
 
   dokuwiki:
-    image: dokuwiki
+    image: dotriver/dokuwiki
     environment:
         - TITLE=Test title
         - ADMIN_USERNAME=admin
@@ -17,7 +17,7 @@ services:
         - SEND_USAGE_DATA=TRUE
         - APP_LANGUAGE=en
 
-        - USE_LDAP=TRUE
+        - USE_LDAP=FALSE
         - LDAP_BASE_DN=dc=example,dc=com
         - LDAP_HOST=fd
         - LDAP_ADMIN_PASS=password
