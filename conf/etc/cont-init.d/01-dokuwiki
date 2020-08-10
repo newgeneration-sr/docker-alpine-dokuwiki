@@ -6,12 +6,15 @@ run(){
 }
 
 enable_plugin() {
-    sed -i "/$1/d" /var/www/dokuwiki/conf/plugins.php
+    grep "$1" /var/www/dokuwiki/conf/plugins.local.php && \
+    sed -i "/$1/d" /var/www/dokuwiki/conf/plugins.local.php || \
+    echo "\$plugins['$1'] = 1;" >> /var/www/dokuwiki/conf/plugins.local.php 
+
 }
 
 disable_plugin() {
-    ! grep "$1" /var/www/dokuwiki/conf/plugins.php && \
-    echo "\$plugins['$1'] = 0;" >>plugins.php
+    ! grep "$1" /var/www/dokuwiki/conf/plugins.local.php && \
+    echo "\$plugins['$1'] = 0;" >> /var/www/dokuwiki/conf/plugins.local.php 
 }
 
 check_bool() {
@@ -77,8 +80,9 @@ install(){
 
 config(){
     echo "> Config"
-
     cd /var/www/dokuwiki
+    rm conf/local.php conf/users.auth.php conf/acl.auth.php
+    cp install.php install.php.old
 
     if check_language "${APP_LANGUAGE}"
     then
@@ -90,7 +94,6 @@ config(){
     fi
 
     echo ">>> Patching install.php script"
-    cp install.php install.php.old
     sed -i "s/isset(\$_REQUEST\['submit'\])/true/" install.php
     sed -i "s/\$_REQUEST/\$FAKE_REQUEST/g" install.php
 
@@ -146,9 +149,7 @@ config(){
         enable_plugin authldap
         sed -i "/\$conf\['superuser'\].*/c\\\$conf\['superuser'\] = '@$LDAP_ADMIN_GROUP';" conf/local.php
         LDAP_CONF="
-/**
-* LDAP configuration
-*/
+
 \$conf['authtype']       = 'authldap';
 
 \$conf['plugin']['authldap']['server']        = '${LDAP_HOST}';
@@ -160,6 +161,7 @@ config(){
 \$conf['plugin']['authldap']['grouptree']     = 'ou=groups,${LDAP_BASE_DN}';
 \$conf['plugin']['authldap']['userfilter']    = 'uid=%{user}';
 \$conf['plugin']['authldap']['groupfilter']   = '(|(gidNumber=%{gid})(member=uid=%{user},ou=people,${LDAP_BASE_DN}))';
+
 "
 
         echo "$LDAP_CONF" >>conf/local.php
