@@ -6,10 +6,7 @@ run(){
 }
 
 enable_plugin() {
-    grep "$1" /var/www/dokuwiki/conf/plugins.local.php && \
-    sed -i "/$1/d" /var/www/dokuwiki/conf/plugins.local.php || \
-    echo "\$plugins['$1'] = 1;" >> /var/www/dokuwiki/conf/plugins.local.php 
-
+    sed -i "/$1/d" /var/www/dokuwiki/conf/plugins.local.php
 }
 
 disable_plugin() {
@@ -137,7 +134,7 @@ config(){
     chown nginx:nginx install.php install.php.old
 
     echo ">>> Running install.php script"
-    run php install.php >/dev/null
+    run php install.php > /dev/null
 
     echo ">>> Setting up plugins"
     disable_plugin authpdo
@@ -145,7 +142,6 @@ config(){
     if [ "$USE_LDAP" -eq 1 ]
     then
         echo ">>> Configuring LDAP authentication"
-        cp conf/local.php.dist conf/local.php
         enable_plugin authldap
         sed -i "/\$conf\['superuser'\].*/c\\\$conf\['superuser'\] = '@$LDAP_ADMIN_GROUP';" conf/local.php
         LDAP_CONF="
@@ -164,9 +160,9 @@ config(){
 
 "
 
-        echo "$LDAP_CONF" >>conf/local.php
+        echo "$LDAP_CONF" >> conf/local.php
     fi
-
+    rm install.php install.php.old
     return 0
 }
 
