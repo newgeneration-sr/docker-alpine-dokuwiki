@@ -6,12 +6,12 @@ run(){
 }
 
 enable_plugin() {
-    sed -i "/$1/d" /var/www/dokuwiki/conf/plugins.local.php
+    sed -i "/$1/d" /var/www/dokuwiki/conf/plugins.php
 }
 
 disable_plugin() {
-    ! grep "$1" /var/www/dokuwiki/conf/plugins.local.php && \
-    echo "\$plugins['$1'] = 0;" >>plugins.local.php
+    ! grep "$1" /var/www/dokuwiki/conf/plugins.php && \
+    echo "\$plugins['$1'] = 0;" >>plugins.php
 }
 
 check_bool() {
@@ -142,6 +142,7 @@ config(){
     if [ "$USE_LDAP" -eq 1 ]
     then
         echo ">>> Configuring LDAP authentication"
+        cp conf/local.php.dist conf/local.php
         enable_plugin authldap
         sed -i "/\$conf\['superuser'\].*/c\\\$conf\['superuser'\] = '@$LDAP_ADMIN_GROUP';" conf/local.php
         LDAP_CONF="
