@@ -1,11 +1,15 @@
+![docker build automated](https://img.shields.io/docker/cloud/automated/dotriver/dokuwiki)
+![docker build status](https://img.shields.io/docker/cloud/build/dotriver/dokuwiki)
+![docker build status](https://img.shields.io/docker/cloud/pulls/dotriver/dokuwiki)
+
 # Dokuwiki on Alpine Linux + S6 Overlay
 
 # Auto configuration parameters :
 
-- TITLE=Titre de test
+- TITLE=Title of the Dokuwiki
 - ADMIN_USERNAME=admin
-- ADMIN_FULLNAME=jean admin
-- ADMIN_EMAIL=jean.admin@test.com
+- ADMIN_FULLNAME=admin smith jr
+- ADMIN_EMAIL=smith.admin.jr@test.com
 - ADMIN_PASSWORD=password
 
 - ACL_POLICY=open
